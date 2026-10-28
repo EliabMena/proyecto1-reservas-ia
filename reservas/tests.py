@@ -139,3 +139,29 @@ class CalendarioDisponibilidadTests(TestCase):
 
         self.assertFalse(response.json()['success'])
         self.assertEqual(Booking.objects.count(), 1)
+
+    def test_rechaza_una_reserva_con_fin_anterior_al_inicio(self):
+        response = self._crear_reserva(
+            '2026-11-02T11:00:00+00:00',
+            '2026-11-02T10:00:00+00:00',
+        )
+
+        self.assertFalse(response.json()['success'])
+        self.assertIn('posterior', response.json()['error'].lower())
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_rechaza_una_reserva_en_un_recurso_inexistente(self):
+        response = self.client.post(
+            self.url_crear,
+            data=json.dumps({
+                'resource_id': 9999,
+                'start_time': '2026-11-02T10:00:00+00:00',
+                'end_time': '2026-11-02T11:00:00+00:00',
+                'repeat_weeks': 0,
+            }),
+            content_type='application/json',
+        )
+
+        self.assertFalse(response.json()['success'])
+        self.assertIn('no existe', response.json()['error'].lower())
+        self.assertEqual(Booking.objects.count(), 0)
