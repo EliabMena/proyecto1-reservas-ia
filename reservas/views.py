@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta, time
+from django.db import transaction
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -103,6 +104,7 @@ def calendario_full(request, resource_id):
         {
             "start": bloqueo.start_time.isoformat(),
             "end": bloqueo.end_time.isoformat(),
+            "title": "No disponible",
         }
         for bloqueo in bloqueos
     ]
@@ -114,6 +116,27 @@ def calendario_full(request, resource_id):
         'is_authenticated': request.user.is_authenticated,
     })
 
+
+
+def _conflicto_disponibilidad(resource_id, start, end):
+    """
+    Devuelve el motivo por el que una franja no está disponible, si lo hay.
+    """
+    if Availability.objects.filter(
+        resource_id=resource_id,
+        start_time__lt=end,
+        end_time__gt=start
+    ).exists():
+        return 'La franja horaria está bloqueada por el administrador.'
+
+    if Booking.objects.filter(
+        resource_id=resource_id,
+        start_time__lt=end,
+        end_time__gt=start
+    ).exists():
+        return 'Ya existe una reserva en esta franja horaria.'
+
+    return None
 
 
 @csrf_exempt
@@ -131,33 +154,39 @@ def api_crear_reserva(request):
             end_time = parse_datetime(data.get('end_time'))
             repeat_weeks = int(data.get('repeat_weeks', 0))
 
+            if not Resource.objects.filter(pk=resource_id).exists():
+                return JsonResponse({'success': False, 'error': 'El recurso no existe.'})
+
+            if not start_time or not end_time:
+                return JsonResponse({'success': False, 'error': 'Las fechas de la reserva no son válidas.'})
+
+            if start_time >= end_time:
+                return JsonResponse({'success': False, 'error': 'La hora de fin debe ser posterior a la de inicio.'})
+
+            if repeat_weeks < 0:
+                return JsonResponse({'success': False, 'error': 'El número de repeticiones no es válido.'})
+
             reservas_creadas = []
 
-            for i in range(repeat_weeks + 1):
-                start = start_time + timedelta(weeks=i)
-                end = end_time + timedelta(weeks=i)
+            with transaction.atomic():
+                for i in range(repeat_weeks + 1):
+                    start = start_time + timedelta(weeks=i)
+                    end = end_time + timedelta(weeks=i)
 
-                overlapping = Booking.objects.filter(
-                    resource_id=resource_id,
-                    start_time__lt=end,
-                    end_time__gt=start
-                )
-                if overlapping.exists():
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Conflicto: hay una reserva en la semana {i + 1} ({start}).'
+                    conflicto = _conflicto_disponibilidad(resource_id, start, end)
+                    if conflicto:
+                        raise ValueError(f'{conflicto} (semana {i + 1})')
+
+                    Booking.objects.create(
+                        user=request.user,
+                        resource_id=resource_id,
+                        start_time=start,
+                        end_time=end
+                    )
+                    reservas_creadas.append({
+                        'start': start.isoformat(),
+                        'end': end.isoformat()
                     })
-
-                booking = Booking.objects.create(
-                    user=request.user,
-                    resource_id=resource_id,
-                    start_time=start,
-                    end_time=end
-                )
-                reservas_creadas.append({
-                    'start': start.isoformat(),
-                    'end': end.isoformat()
-                })
 
             return JsonResponse({'success': True, 'reservas': reservas_creadas})
         except Exception as e:

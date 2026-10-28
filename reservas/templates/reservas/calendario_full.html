@@ -40,6 +40,43 @@
             background: #1e40af;
         }
 
+        /* === LEYENDA DE DISPONIBILIDAD === */
+        .leyenda {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            max-width: 1000px;
+            margin: 0 auto 15px;
+            color: #374151;
+            font-size: 0.95rem;
+        }
+
+        .leyenda-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .leyenda-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        .leyenda-disponible {
+            background: white;
+            border: 1px solid #9ca3af;
+        }
+
+        .leyenda-reservado {
+            background: #10b981;
+        }
+
+        .leyenda-bloqueado {
+            background: #ef4444;
+        }
+
         /* === NAVBAR === */
         .navbar {
             position: fixed;
@@ -119,6 +156,12 @@
 
     <!-- Botón para actualizar eventos -->
     <button id="btn-refresh">🔄 Actualizar Reservas</button>
+
+    <div class="leyenda" aria-label="Leyenda del calendario">
+        <span class="leyenda-item"><span class="leyenda-color leyenda-disponible"></span>Disponible</span>
+        <span class="leyenda-item"><span class="leyenda-color leyenda-reservado"></span>Reservado</span>
+        <span class="leyenda-item"><span class="leyenda-color leyenda-bloqueado"></span>Bloqueado</span>
+    </div>
     
     <!-- Contenedor del calendario con data-resource-id y user-logged -->
     <div id='calendar' 
@@ -169,6 +212,9 @@
                 slotMinTime: "09:00:00", // Horario inicial
                 slotMaxTime: "21:00:00", // Horario final
                 slotDuration: "01:00:00",
+                selectAllow: function(info) {
+                    return !isBlocked(info.start, info.end) && !isReserved(info.start, info.end);
+                },
                 select: function(info) {
                     const start = new Date(info.startStr);
                     const end = new Date(info.endStr);
@@ -234,6 +280,9 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
+                        data.reservas.forEach(function(reserva) {
+                            reservas.push(reserva);
+                        });
                         alert(`Reserva(s) creada(s) correctamente: ${data.reservas.length} reserva(s).`);
                         calendar.refetchEvents();
                     } else {
