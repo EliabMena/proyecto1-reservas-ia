@@ -3,9 +3,11 @@ from datetime import datetime, timedelta, time
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from django.utils.dateformat import format as date_format
 from django.utils.dateparse import parse_datetime
-from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from .models import Resource, Booking, Availability
 from .models import Resource
@@ -131,6 +133,10 @@ def api_crear_reserva(request):
             end_time = parse_datetime(data.get('end_time'))
             repeat_weeks = int(data.get('repeat_weeks', 0))
 
+            resource = Resource.objects.filter(pk=resource_id).first()
+            if resource is None:
+                return JsonResponse({'success': False, 'error': 'El recurso no existe.'})
+
             reservas_creadas = []
 
             for i in range(repeat_weeks + 1):
@@ -150,19 +156,39 @@ def api_crear_reserva(request):
 
                 booking = Booking.objects.create(
                     user=request.user,
-                    resource_id=resource_id,
+                    resource=resource,
                     start_time=start,
                     end_time=end
                 )
                 reservas_creadas.append({
+                    'id': booking.id,
+                    'resource': resource.name,
                     'start': start.isoformat(),
-                    'end': end.isoformat()
+                    'end': end.isoformat(),
+                    'detail_url': reverse('reserva_detalle', args=[booking.id]),
                 })
 
             return JsonResponse({'success': True, 'reservas': reservas_creadas})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+
+
+@login_required(login_url='login')
+def reserva_detalle(request, booking_id):
+    """
+    Muestra la confirmación de una reserva al usuario que la creó.
+    """
+    reservas = Booking.objects.select_related('resource', 'user')
+
+    if request.user.is_staff:
+        reserva = get_object_or_404(reservas, pk=booking_id)
+    else:
+        reserva = get_object_or_404(reservas, pk=booking_id, user=request.user)
+
+    return render(request, 'reservas/reserva_detalle.html', {
+        'reserva': reserva,
+    })
 
 
 def login_view(request):
