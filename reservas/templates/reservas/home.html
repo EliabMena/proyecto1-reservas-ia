@@ -13,6 +13,7 @@
         <div>
             {% if user.is_authenticated %}
                 <span class="mr-4">Hola, {{ user.username }}</span>
+                <a href="{% url 'mis_reservas' %}" class="bg-blue-500 px-3 py-1 rounded hover:bg-blue-600 mr-2">Mis reservas</a>
                 <a href="{% url 'logout' %}" class="bg-red-500 px-3 py-1 rounded hover:bg-red-600">Cerrar Sesión</a>
             {% else %}
                 <a href="{% url 'login' %}" class="bg-green-500 px-3 py-1 rounded hover:bg-green-600">Iniciar Sesión</a>

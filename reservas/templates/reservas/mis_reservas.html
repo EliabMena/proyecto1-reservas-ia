@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis reservas - Gestor de Reservas</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f9fafb;
+            color: #111827;
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 24px;
+            background: #2563eb;
+            color: white;
+        }
+
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 16px;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        .mensajes {
+            margin-bottom: 20px;
+        }
+
+        .mensaje {
+            margin-bottom: 10px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .mensaje.error {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .tabla-contenedor {
+            overflow-x: auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+        }
+
+        th {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .estado {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .estado-confirmed {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .estado-cancelled {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .cancelar {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            background: #ef4444;
+            color: white;
+            cursor: pointer;
+        }
+
+        .cancelar:hover {
+            background: #dc2626;
+        }
+
+        .sin-reservas {
+            padding: 30px;
+            text-align: center;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Gestor de Reservas</h1>
+        <div class="nav-links">
+            <a href="{% url 'home' %}">Inicio</a>
+            <span>Hola, {{ user.username }}</span>
+            <a href="{% url 'logout' %}">Cerrar sesión</a>
+        </div>
+    </nav>
+
+    <main>
+        <h2>Mis reservas</h2>
+
+        {% if messages %}
+        <div class="mensajes">
+            {% for message in messages %}
+            <div class="mensaje{% if message.tags == 'error' %} error{% endif %}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="tabla-contenedor">
+            {% if reservas %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Recurso</th>
+                        <th>Inicio</th>
+                        <th>Fin</th>
+                        <th>Estado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for reserva in reservas %}
+                    <tr>
+                        <td>{{ reserva.resource.name }}</td>
+                        <td>{{ reserva.start_time|date:"d/m/Y H:i" }}</td>
+                        <td>{{ reserva.end_time|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <span class="estado estado-{{ reserva.status }}">{{ reserva.get_status_display }}</span>
+                        </td>
+                        <td>
+                            {% if reserva.status == 'confirmed' and reserva.start_time > ahora %}
+                            <form method="post" action="{% url 'cancelar_reserva' reserva.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="cancelar">Cancelar reserva</button>
+                            </form>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="sin-reservas">Todavía no tienes reservas.</p>
+            {% endif %}
+        </div>
+    </main>
+</body>
+</html>

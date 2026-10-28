@@ -20,6 +20,6 @@ class AvailabilityAdmin(admin.ModelAdmin):
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'resource', 'start_time', 'end_time', 'created_at')
-    list_filter = ('resource', 'user')
+    list_display = ('id', 'user', 'resource', 'start_time', 'end_time', 'status', 'created_at')
+    list_filter = ('resource', 'user', 'status')
     search_fields = ('user__username', 'resource__name')
