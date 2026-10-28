@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from .models import Availability, Booking, Resource
 
@@ -237,6 +237,36 @@ def logout_view(request):
     """
     logout(request)
     return redirect('/login/')
+
+@require_GET
+def api_perfil(request):
+    """
+    Devuelve únicamente los datos personales del usuario autenticado.
+
+    Al obtener el usuario desde la sesión (request.user) no se acepta ningún
+    identificador externo, por lo que no es posible consultar los datos de
+    otra persona.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {'success': False, 'error': 'Debes iniciar sesión para consultar tus datos.'},
+            status=403
+        )
+
+    user = request.user
+    nombre_completo = f"{user.first_name} {user.last_name}".strip()
+
+    return JsonResponse({
+        'success': True,
+        'perfil': {
+            'username': user.username,
+            'nombre': nombre_completo or user.username,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+        }
+    })
+
 
 def api_reservas(request, resource_id):
     """

@@ -128,6 +128,105 @@
             margin-right: 10px;
             font-weight: 500;
         }
+
+        /* === MODAL DE CONFIRMACIÓN DE DATOS === */
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(17, 24, 39, 0.55);
+        }
+
+        .modal[hidden] {
+            display: none;
+        }
+
+        .modal-content {
+            width: 100%;
+            max-width: 480px;
+            padding: 24px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+            font-size: 1.3rem;
+            color: #111827;
+        }
+
+        .modal-subtitle {
+            margin-top: 0;
+            color: #6b7280;
+        }
+
+        .datos-usuario {
+            margin: 20px 0;
+            padding: 16px;
+            background: #f3f4f6;
+            border-radius: 8px;
+        }
+
+        .datos-usuario div {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 6px 0;
+        }
+
+        .datos-usuario dt {
+            font-weight: bold;
+            color: #374151;
+        }
+
+        .datos-usuario dd {
+            margin: 0;
+            color: #111827;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .reserva-franja {
+            color: #374151;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        .modal-actions button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1e40af;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
     </style>
 </head>
 <body>
@@ -169,6 +268,38 @@
          data-user-logged="{{ is_authenticated }}">
     </div>
 
+    <!-- Revisión de los datos guardados antes de reservar -->
+    <div id="modal-datos" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-titulo" hidden>
+        <div class="modal-content">
+            <h2 id="modal-titulo">Revisa tus datos antes de reservar</h2>
+            <p class="modal-subtitle">Estos son los datos guardados en tu cuenta.</p>
+
+            <dl class="datos-usuario">
+                <div>
+                    <dt>Usuario</dt>
+                    <dd id="perfil-username"></dd>
+                </div>
+                <div>
+                    <dt>Nombre</dt>
+                    <dd id="perfil-nombre"></dd>
+                </div>
+                <div>
+                    <dt>Correo electrónico</dt>
+                    <dd id="perfil-email"></dd>
+                </div>
+            </dl>
+
+            <p class="reserva-franja">
+                Franja seleccionada: <strong id="reserva-franja"></strong>
+            </p>
+
+            <div class="modal-actions">
+                <button type="button" id="btn-cancelar-reserva" class="btn-secondary">Cancelar</button>
+                <button type="button" id="btn-confirmar-reserva" class="btn-primary">Confirmar reserva</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             console.log("=== INICIANDO FULLCALENDAR CON BLOQUEOS Y RESERVAS ===");
@@ -180,6 +311,8 @@
             // Datos de reservas y bloqueos enviados desde Django
             const reservas = JSON.parse('{{ reservas_json|escapejs }}');
             const bloqueos = JSON.parse('{{ bloqueos_json|escapejs }}');
+
+            let reservaPendiente = null;
 
             // Verifica si hay bloqueo del admin
             function isBlocked(start, end) {
@@ -234,9 +367,7 @@
                         return;
                     }
 
-                    if (confirm(`¿Quieres crear una reserva desde ${info.startStr} hasta ${info.endStr}?`)) {
-                        crearReserva(info.startStr, info.endStr);
-                    }
+                    revisarDatosYReservar(info.startStr, info.endStr);
                 },
                 eventSources: [
     {
@@ -256,6 +387,58 @@
             });
 
             calendar.render();
+
+            function formatearFecha(valor) {
+                return new Date(valor).toLocaleString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            function cerrarModalDatos() {
+                document.getElementById('modal-datos').hidden = true;
+                reservaPendiente = null;
+            }
+
+            function revisarDatosYReservar(start, end) {
+                fetch('/api/perfil/', { headers: { 'Accept': 'application/json' } })
+                    .then(function(response) {
+                        return response.json().then(function(data) {
+                            return { response: response, data: data };
+                        });
+                    })
+                    .then(function(resultado) {
+                        if (!resultado.response.ok || !resultado.data.success) {
+                            throw new Error(resultado.data.error || 'No se pudieron cargar tus datos.');
+                        }
+
+                        const perfil = resultado.data.perfil;
+                        document.getElementById('perfil-username').textContent = perfil.username || 'No guardado';
+                        document.getElementById('perfil-nombre').textContent = perfil.nombre || 'No guardado';
+                        document.getElementById('perfil-email').textContent = perfil.email || 'No guardado';
+                        document.getElementById('reserva-franja').textContent =
+                            formatearFecha(start) + ' - ' + formatearFecha(end);
+
+                        reservaPendiente = { start: start, end: end };
+                        document.getElementById('modal-datos').hidden = false;
+                        document.getElementById('btn-confirmar-reserva').focus();
+                    })
+                    .catch(function(error) {
+                        alert(error.message || 'No se pudieron cargar tus datos.');
+                    });
+            }
+
+            document.getElementById('btn-cancelar-reserva').addEventListener('click', cerrarModalDatos);
+
+            document.getElementById('btn-confirmar-reserva').addEventListener('click', function() {
+                if (!reservaPendiente) return;
+                const reserva = reservaPendiente;
+                cerrarModalDatos();
+                crearReserva(reserva.start, reserva.end);
+            });
 
             // === FUNCIÓN CREAR RESERVA CON REPETICIONES ===
             function crearReserva(start, end) {
