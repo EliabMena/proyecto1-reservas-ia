@@ -9,6 +9,7 @@ urlpatterns = [
     path('api/reservas/crear/', views.api_crear_reserva, name='api_crear_reserva'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('favicon.ico', views.favicon),
 
 
 

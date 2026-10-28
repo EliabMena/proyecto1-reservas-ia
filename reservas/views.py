@@ -1,14 +1,15 @@
 import json
-from datetime import datetime, timedelta, time
-from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.dateformat import format as date_format
-from django.utils.dateparse import parse_datetime
-from django.contrib.auth import authenticate, login, logout
+from datetime import timedelta, time
+
 from django.contrib import messages
-from .models import Resource, Booking, Availability
-from .models import Resource
+from django.contrib.auth import authenticate, login, logout
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from django.views.decorators.csrf import ensure_csrf_cookie
+
+from .models import Availability, Booking, Resource
 
 
 # Horario por defecto (si no hay Availability definida)
@@ -22,42 +23,14 @@ def calendario(request, resource_id):
     """
     resource = get_object_or_404(Resource, id=resource_id)
 
-    hoy = datetime.today()
-    inicio_semana = hoy - timedelta(days=hoy.weekday())  # Lunes
-    dias_semana = [inicio_semana + timedelta(days=i) for i in range(7)]
-
-    reservas = Booking.objects.filter(
-        resource=resource,
-        start_time__date__gte=inicio_semana,
-        start_time__date__lte=inicio_semana + timedelta(days=6)
-    ).order_by('start_time')
-
-    reservas_por_dia = {date_format(dia, 'Y-m-d'): [] for dia in dias_semana}
-    for reserva in reservas:
-        clave = date_format(reserva.start_time, 'Y-m-d')
-        reservas_por_dia[clave].append(reserva)
-
-    return render(request, 'reservas/calendario.html', {
-        'resource': resource,
-        'dias_semana': dias_semana,
-        'reservas_por_dia': reservas_por_dia,
-    })
-
-
-def calendario_navegable(request, resource_id):
-    """
-    Calendario semanal con botones de semana anterior/siguiente.
-    """
-    resource = get_object_or_404(Resource, id=resource_id)
-
-    hoy = datetime.today()
+    hoy = timezone.localdate()
     delta = 0
     if request.GET.get('week') == 'prev':
         delta = -7
     elif request.GET.get('week') == 'next':
         delta = 7
 
-    inicio_semana = (hoy - timedelta(days=hoy.weekday())) + timedelta(days=delta)
+    inicio_semana = hoy - timedelta(days=hoy.weekday()) + timedelta(days=delta)
     dias_semana = [inicio_semana + timedelta(days=i) for i in range(7)]
 
     reservas = Booking.objects.filter(
@@ -66,18 +39,23 @@ def calendario_navegable(request, resource_id):
         start_time__date__lte=inicio_semana + timedelta(days=6)
     ).order_by('start_time')
 
-    reservas_por_dia = {date_format(dia, 'Y-m-d'): [] for dia in dias_semana}
+    reservas_por_dia = {dia.isoformat(): [] for dia in dias_semana}
     for reserva in reservas:
-        clave = date_format(reserva.start_time, 'Y-m-d')
+        clave = timezone.localtime(reserva.start_time).date().isoformat()
         reservas_por_dia[clave].append(reserva)
+
+    dias_semana = [
+        {'fecha': dia, 'reservas': reservas_por_dia[dia.isoformat()]}
+        for dia in dias_semana
+    ]
 
     return render(request, 'reservas/calendario.html', {
         'resource': resource,
         'dias_semana': dias_semana,
-        'reservas_por_dia': reservas_por_dia,
     })
 
 
+@ensure_csrf_cookie
 def calendario_full(request, resource_id):
     """
     Calendario interactivo con FullCalendar.
@@ -92,7 +70,7 @@ def calendario_full(request, resource_id):
         {
             "start": reserva.start_time.isoformat(),
             "end": reserva.end_time.isoformat(),
-            "title": f"Reservado por {reserva.user.username}",
+            "title": "Reservado",
             "color": "#10b981",  # Verde reservas
         }
         for reserva in reservas
@@ -116,7 +94,6 @@ def calendario_full(request, resource_id):
 
 
 
-@csrf_exempt
 def api_crear_reserva(request):
     """
     Endpoint para crear una nueva reserva, con soporte para repeticiones semanales.
@@ -195,7 +172,7 @@ def api_reservas(request, resource_id):
     reservas = Booking.objects.filter(resource_id=resource_id).order_by('start_time')
     eventos = [
         {
-            "title": f"Reservado por {reserva.user.username}",
+            "title": "Reservado",
             "start": reserva.start_time.isoformat(),
             "end": reserva.end_time.isoformat(),
             "color": "#10b981",  # Verde
@@ -203,6 +180,14 @@ def api_reservas(request, resource_id):
         for reserva in reservas
     ]
     return JsonResponse(eventos, safe=False)
+
+
+def favicon(request):
+    """
+    Evita el error 404 del navegador al solicitar el favicon.
+    """
+    return HttpResponse(status=204)
+
 
 def home(request):
     """

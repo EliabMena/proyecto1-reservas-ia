@@ -98,7 +98,7 @@
         <thead>
             <tr>
                 {% for dia in dias_semana %}
-                <th>{{ dia|date:"l d M" }}</th>
+                <th>{{ dia.fecha|date:"l d M" }}</th>
                 {% endfor %}
             </tr>
         </thead>
@@ -106,18 +106,16 @@
             <tr>
                 {% for dia in dias_semana %}
                 <td>
-                    {% with fecha=dia|date:"Y-m-d" %}
-                        {% if reservas_por_dia.fecha %}
-                            {% for reserva in reservas_por_dia.fecha %}
-                                <div class="reserva">
-                                    {{ reserva.start_time|date:"H:i" }} - {{ reserva.end_time|date:"H:i" }}<br>
-                                    ({{ reserva.user.username }})
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <span class="sin-reserva">Libre</span>
-                        {% endif %}
-                    {% endwith %}
+                    {% if dia.reservas %}
+                        {% for reserva in dia.reservas %}
+                            <div class="reserva">
+                                {{ reserva.start_time|date:"H:i" }} - {{ reserva.end_time|date:"H:i" }}<br>
+                                Reservado
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <span class="sin-reserva">Libre</span>
+                    {% endif %}
                 </td>
                 {% endfor %}
             </tr>
