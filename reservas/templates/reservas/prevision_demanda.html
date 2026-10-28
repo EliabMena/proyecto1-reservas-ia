@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Previsión de demanda - Gestor de Reservas</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f9fafb;
+            color: #111827;
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 24px;
+            background: #2563eb;
+            color: white;
+        }
+
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 32px auto;
+            padding: 0 20px;
+        }
+
+        h2 {
+            margin-bottom: 8px;
+        }
+
+        .descripcion {
+            margin-top: 0;
+            color: #4b5563;
+        }
+
+        .aviso {
+            margin: 20px 0;
+            padding: 14px 16px;
+            border-left: 4px solid #f59e0b;
+            border-radius: 6px;
+            background: #fffbeb;
+            color: #92400e;
+        }
+
+        .resumen {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .tarjeta {
+            padding: 18px;
+            background: white;
+            border-radius: 9px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .tarjeta span {
+            display: block;
+            margin-bottom: 6px;
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        .tarjeta strong {
+            font-size: 1.6rem;
+        }
+
+        .grafico {
+            position: relative;
+            height: 480px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Gestor de Reservas</h1>
+        <div class="nav-links">
+            <a href="{% url 'home' %}">Inicio</a>
+            <a href="/admin/">Administración</a>
+            <span>Hola, {{ user.username }}</span>
+            <a href="{% url 'logout' %}">Cerrar sesión</a>
+        </div>
+    </nav>
+
+    <main>
+        <h2>Previsión de demanda</h2>
+        <p class="descripcion">
+            Reservas por semana durante las últimas {{ semanas_historico }} semanas
+            y estimación para las próximas {{ semanas_prevision }}.
+        </p>
+
+        {% if not datos_suficientes %}
+        <div class="aviso" role="status">
+            No hay datos históricos suficientes para calcular una previsión.
+            Se necesitan reservas en al menos 2 semanas.
+        </div>
+        {% endif %}
+
+        <section class="resumen" aria-label="Resumen de demanda">
+            <div class="tarjeta">
+                <span>Reservas históricas</span>
+                <strong>{{ total_historico }}</strong>
+            </div>
+            <div class="tarjeta">
+                <span>Semanas con datos</span>
+                <strong>{{ semanas_con_datos }}</strong>
+            </div>
+            <div class="tarjeta">
+                <span>Media semanal estimada</span>
+                <strong>{% if promedio_semanal is not None %}{{ promedio_semanal }}{% else %}-{% endif %}</strong>
+            </div>
+        </section>
+
+        <section class="grafico">
+            <canvas id="grafico-demanda" role="img" aria-label="Gráfico de demanda histórica y estimada"></canvas>
+        </section>
+    </main>
+
+    {{ datos_grafico|json_script:"datos-demanda" }}
+    <script>
+        const datos = JSON.parse(document.getElementById('datos-demanda').textContent);
+
+        new Chart(document.getElementById('grafico-demanda'), {
+            type: 'line',
+            data: {
+                labels: datos.labels,
+                datasets: [
+                    {
+                        label: 'Histórico',
+                        data: datos.historico,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        spanGaps: false
+                    },
+                    {
+                        label: 'Estimación',
+                        data: datos.prevision,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                        borderDash: [6, 6],
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        spanGaps: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Reservas por semana'
+                        },
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const valor = context.parsed.y;
+                                return context.dataset.label + ': ' + (valor === null ? 'Sin datos' : valor + ' reservas');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
