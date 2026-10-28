@@ -620,6 +620,17 @@ class ConfirmacionReservaTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('login'), response.url)
 
+    def test_el_detalle_muestra_el_estado_cancelado(self):
+        reserva = self._reserva_en_bd()
+        reserva.status = Booking.Status.CANCELLED
+        reserva.save(update_fields=['status'])
+
+        response = self.client.get(reverse('reserva_detalle', args=[reserva.id]))
+
+        self.assertContains(response, 'Reserva cancelada')
+        self.assertContains(response, 'Esta reserva ha sido cancelada.')
+        self.assertNotContains(response, 'La reserva se ha registrado correctamente.')
+
     def test_el_calendario_incluye_el_modal_de_confirmacion(self):
         response = self.client.get(reverse('calendario_full', args=[self.resource.id]))
 

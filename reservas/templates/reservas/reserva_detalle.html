@@ -63,6 +63,11 @@
             font-weight: bold;
         }
 
+        .estado-cancelado {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
         h2 {
             margin-top: 0;
         }
@@ -130,9 +135,19 @@
 
     <main>
         <section class="confirmacion">
-            <span class="estado">Reserva confirmada</span>
+            {% if reserva.status == 'cancelled' %}
+                <span class="estado estado-cancelado">Reserva cancelada</span>
+            {% else %}
+                <span class="estado">Reserva confirmada</span>
+            {% endif %}
             <h2>Reserva #{{ reserva.id }}</h2>
-            <p>La reserva se ha registrado correctamente.</p>
+            <p>
+                {% if reserva.status == 'cancelled' %}
+                    Esta reserva ha sido cancelada.
+                {% else %}
+                    La reserva se ha registrado correctamente.
+                {% endif %}
+            </p>
 
             <dl>
                 <div>
