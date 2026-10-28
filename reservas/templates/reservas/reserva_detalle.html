@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reserva #{{ reserva.id }} - Gestor de Reservas</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f9fafb;
+            color: #111827;
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 24px;
+            background: #2563eb;
+            color: white;
+        }
+
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 16px;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            max-width: 640px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .confirmacion {
+            padding: 24px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .estado {
+            display: inline-block;
+            margin-bottom: 12px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: #ecfdf5;
+            color: #047857;
+            font-weight: bold;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        dl {
+            margin: 24px 0;
+        }
+
+        dl div {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        dt {
+            color: #6b7280;
+            font-weight: bold;
+        }
+
+        dd {
+            margin: 0;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .acciones {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .acciones a {
+            padding: 10px 16px;
+            border-radius: 6px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+        }
+
+        .acciones a:hover {
+            background: #1e40af;
+        }
+
+        .acciones .secundario {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .acciones .secundario:hover {
+            background: #d1d5db;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Gestor de Reservas</h1>
+        <div class="nav-links">
+            <a href="{% url 'home' %}">Inicio</a>
+            <a href="{% url 'logout' %}">Cerrar sesión</a>
+        </div>
+    </nav>
+
+    <main>
+        <section class="confirmacion">
+            <span class="estado">Reserva confirmada</span>
+            <h2>Reserva #{{ reserva.id }}</h2>
+            <p>La reserva se ha registrado correctamente.</p>
+
+            <dl>
+                <div>
+                    <dt>Identificador</dt>
+                    <dd>#{{ reserva.id }}</dd>
+                </div>
+                <div>
+                    <dt>Recurso</dt>
+                    <dd>{{ reserva.resource.name }}</dd>
+                </div>
+                <div>
+                    <dt>Usuario</dt>
+                    <dd>{{ reserva.user.username }}</dd>
+                </div>
+                <div>
+                    <dt>Inicio</dt>
+                    <dd>{{ reserva.start_time|date:"d/m/Y H:i" }}</dd>
+                </div>
+                <div>
+                    <dt>Fin</dt>
+                    <dd>{{ reserva.end_time|date:"d/m/Y H:i" }}</dd>
+                </div>
+                <div>
+                    <dt>Fecha de creación</dt>
+                    <dd>{{ reserva.created_at|date:"d/m/Y H:i" }}</dd>
+                </div>
+            </dl>
+
+            <div class="acciones">
+                <a href="{% url 'calendario_full' reserva.resource.id %}">Volver al calendario</a>
+                <a href="{% url 'home' %}" class="secundario">Ir al inicio</a>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

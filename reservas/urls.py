@@ -7,6 +7,7 @@ urlpatterns = [
     path('calendario_full/<int:resource_id>/', views.calendario_full, name='calendario_full'),
     path('mis-reservas/', views.mis_reservas, name='mis_reservas'),
     path('mis-reservas/<int:booking_id>/cancelar/', views.cancelar_reserva, name='cancelar_reserva'),
+    path('reserva/<int:booking_id>/', views.reserva_detalle, name='reserva_detalle'),
     path('api/reservas/<int:resource_id>/', views.api_reservas, name='api_reservas'),
     path('api/reservas/crear/', views.api_crear_reserva, name='api_crear_reserva'),
     path('api/perfil/', views.api_perfil, name='api_perfil'),

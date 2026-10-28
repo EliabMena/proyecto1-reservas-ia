@@ -129,8 +129,9 @@
             font-weight: 500;
         }
 
-        /* === MODAL DE CONFIRMACIÓN DE DATOS === */
-        .modal {
+        /* === MODALES === */
+        .modal,
+        .modal-confirmacion {
             position: fixed;
             inset: 0;
             z-index: 2000;
@@ -141,17 +142,28 @@
             background: rgba(17, 24, 39, 0.55);
         }
 
-        .modal[hidden] {
+        .modal[hidden],
+        .modal-confirmacion[hidden] {
             display: none;
         }
 
-        .modal-content {
+        .modal-content,
+        .modal-confirmacion-contenido {
             width: 100%;
-            max-width: 480px;
             padding: 24px;
             background: white;
             border-radius: 10px;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-content {
+            max-width: 480px;
+        }
+
+        .modal-confirmacion-contenido {
+            max-width: 520px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .modal-content h2 {
@@ -202,7 +214,8 @@
             margin-top: 24px;
         }
 
-        .modal-actions button {
+        .modal-actions button,
+        .modal-confirmacion button {
             padding: 10px 18px;
             border: none;
             border-radius: 5px;
@@ -226,6 +239,49 @@
 
         .btn-secondary:hover {
             background: #d1d5db;
+        }
+
+        .modal-confirmacion-contenido h2 {
+            margin-top: 0;
+            color: #047857;
+        }
+
+        .reserva-confirmada {
+            margin: 12px 0;
+            padding: 14px;
+            border-left: 4px solid #10b981;
+            border-radius: 6px;
+            background: #f0fdf4;
+        }
+
+        .reserva-confirmada strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .reserva-confirmada p {
+            margin: 0 0 8px;
+            color: #374151;
+        }
+
+        .reserva-confirmada a {
+            color: #2563eb;
+            font-weight: bold;
+        }
+
+        .modal-confirmacion .acciones {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .modal-confirmacion button {
+            background: #2563eb;
+            color: white;
+        }
+
+        .modal-confirmacion button:hover {
+            background: #1e40af;
         }
     </style>
 </head>
@@ -296,6 +352,17 @@
             <div class="modal-actions">
                 <button type="button" id="btn-cancelar-reserva" class="btn-secondary">Cancelar</button>
                 <button type="button" id="btn-confirmar-reserva" class="btn-primary">Confirmar reserva</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-confirmacion" class="modal-confirmacion" role="dialog" aria-modal="true" aria-labelledby="confirmacion-titulo" hidden>
+        <div class="modal-confirmacion-contenido">
+            <h2 id="confirmacion-titulo">Reserva confirmada</h2>
+            <p>La reserva se ha registrado correctamente.</p>
+            <div id="lista-confirmaciones"></div>
+            <div class="acciones">
+                <button type="button" id="btn-cerrar-confirmacion">Cerrar</button>
             </div>
         </div>
     </div>
@@ -440,6 +507,42 @@
                 crearReserva(reserva.start, reserva.end);
             });
 
+            function cerrarConfirmacion() {
+                document.getElementById('modal-confirmacion').hidden = true;
+                document.getElementById('lista-confirmaciones').innerHTML = '';
+            }
+
+            function mostrarConfirmacion(reservas) {
+                const lista = document.getElementById('lista-confirmaciones');
+                lista.innerHTML = '';
+
+                reservas.forEach(function(reserva) {
+                    const item = document.createElement('div');
+                    item.className = 'reserva-confirmada';
+
+                    const titulo = document.createElement('strong');
+                    titulo.textContent = 'Reserva #' + reserva.id;
+
+                    const datos = document.createElement('p');
+                    datos.textContent = reserva.resource + ': ' +
+                        formatearFecha(reserva.start) + ' - ' + formatearFecha(reserva.end);
+
+                    const enlace = document.createElement('a');
+                    enlace.href = reserva.detail_url;
+                    enlace.textContent = 'Consultar reserva';
+
+                    item.appendChild(titulo);
+                    item.appendChild(datos);
+                    item.appendChild(enlace);
+                    lista.appendChild(item);
+                });
+
+                document.getElementById('modal-confirmacion').hidden = false;
+                document.getElementById('btn-cerrar-confirmacion').focus();
+            }
+
+            document.getElementById('btn-cerrar-confirmacion').addEventListener('click', cerrarConfirmacion);
+
             // === FUNCIÓN CREAR RESERVA CON REPETICIONES ===
             function crearReserva(start, end) {
                 let repeat = prompt("¿Cuántas semanas quieres repetir esta reserva? (0 = solo esta semana)", "0");
@@ -462,14 +565,14 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
+                    if (data.success && data.reservas.length > 0) {
                         data.reservas.forEach(function(reserva) {
                             reservas.push(reserva);
                         });
-                        alert(`Reserva(s) creada(s) correctamente: ${data.reservas.length} reserva(s).`);
+                        mostrarConfirmacion(data.reservas);
                         calendar.refetchEvents();
                     } else {
-                        alert(data.error || 'Error al crear la reserva.');
+                        alert(data.error || 'No se pudo confirmar la reserva.');
                     }
                 })
                 .catch(error => console.error('Error:', error));
