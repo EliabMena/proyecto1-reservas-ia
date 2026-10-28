@@ -177,12 +177,14 @@ def api_crear_reserva(request):
                     if conflicto:
                         raise ValueError(f'{conflicto} (semana {i + 1})')
 
-                    Booking.objects.create(
+                    booking = Booking(
                         user=request.user,
                         resource_id=resource_id,
                         start_time=start,
                         end_time=end
                     )
+                    booking.full_clean()
+                    booking.save()
                     reservas_creadas.append({
                         'start': start.isoformat(),
                         'end': end.isoformat()
