@@ -28,10 +28,19 @@ class Availability(models.Model):
 
 class Booking(models.Model):
     """Reserva de un recurso por un usuario."""
+    class Status(models.TextChoices):
+        CONFIRMED = 'confirmed', 'Confirmada'
+        CANCELLED = 'cancelled', 'Cancelada'
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='bookings')
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.CONFIRMED,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -43,12 +52,10 @@ class Booking(models.Model):
         """
         overlapping = Booking.objects.filter(
             resource=self.resource,
+            status=self.Status.CONFIRMED,
             start_time__lt=self.end_time,
             end_time__gt=self.start_time
         ).exclude(pk=self.pk)  # Excluimos la propia reserva al editar
 
         if overlapping.exists():
             raise ValidationError("Ya existe una reserva en esta franja horaria.")
-
-    class Meta:
-        unique_together = ('resource', 'start_time', 'end_time')

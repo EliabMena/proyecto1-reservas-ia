@@ -3,12 +3,14 @@ from datetime import timedelta, time
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
 
 from .models import Availability, Booking, Resource
 
@@ -36,6 +38,7 @@ def calendario(request, resource_id):
 
     reservas = Booking.objects.filter(
         resource=resource,
+        status=Booking.Status.CONFIRMED,
         start_time__date__gte=inicio_semana,
         start_time__date__lte=inicio_semana + timedelta(days=6)
     ).order_by('start_time')
@@ -63,7 +66,10 @@ def calendario_full(request, resource_id):
     """
     resource = get_object_or_404(Resource, id=resource_id)
 
-    reservas = Booking.objects.filter(resource=resource).order_by('start_time')
+    reservas = Booking.objects.filter(
+        resource=resource,
+        status=Booking.Status.CONFIRMED,
+    ).order_by('start_time')
     bloqueos = Availability.objects.filter(resource=resource)
 
     # Lista de reservas
@@ -109,6 +115,7 @@ def _conflicto_disponibilidad(resource_id, start, end):
 
     if Booking.objects.filter(
         resource_id=resource_id,
+        status=Booking.Status.CONFIRMED,
         start_time__lt=end,
         end_time__gt=start
     ).exists():
@@ -173,6 +180,41 @@ def api_crear_reserva(request):
     return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
 
 
+@login_required(login_url='login')
+def mis_reservas(request):
+    """
+    Muestra únicamente las reservas del usuario autenticado.
+    """
+    reservas = Booking.objects.filter(
+        user=request.user,
+    ).select_related('resource').order_by('-start_time')
+
+    return render(request, 'reservas/mis_reservas.html', {
+        'reservas': reservas,
+        'ahora': timezone.now(),
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def cancelar_reserva(request, booking_id):
+    """
+    Cancela una reserva futura del usuario autenticado.
+    """
+    reserva = get_object_or_404(Booking, pk=booking_id, user=request.user)
+
+    if reserva.status == Booking.Status.CANCELLED:
+        messages.error(request, 'La reserva ya está cancelada.')
+    elif reserva.start_time <= timezone.now():
+        messages.error(request, 'No se puede cancelar una reserva que ya ha comenzado.')
+    else:
+        reserva.status = Booking.Status.CANCELLED
+        reserva.save(update_fields=['status'])
+        messages.success(request, 'La reserva se ha cancelado correctamente.')
+
+    return redirect('mis_reservas')
+
+
 def login_view(request):
     """
     Vista para el inicio de sesión de usuarios.
@@ -200,7 +242,10 @@ def api_reservas(request, resource_id):
     """
     API que devuelve todas las reservas de un recurso en formato JSON.
     """
-    reservas = Booking.objects.filter(resource_id=resource_id).order_by('start_time')
+    reservas = Booking.objects.filter(
+        resource_id=resource_id,
+        status=Booking.Status.CONFIRMED,
+    ).order_by('start_time')
     eventos = [
         {
             "title": "Reservado",
