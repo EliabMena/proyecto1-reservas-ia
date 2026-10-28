@@ -1,7 +1,8 @@
 import json
-from datetime import timedelta, time
+from datetime import datetime, timedelta, time
 
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -19,6 +20,87 @@ from .models import Availability, Booking, Resource
 # Horario por defecto (si no hay Availability definida)
 DEFAULT_START = time(9, 0)   # 09:00
 DEFAULT_END = time(21, 0)    # 21:00
+
+# Configuración de la previsión de demanda
+SEMANAS_HISTORICO = 8
+SEMANAS_PREVISION = 4
+MIN_SEMANAS_CON_DATOS = 2
+
+
+def _inicio_semana(fecha):
+    """Devuelve el lunes de la semana a la que pertenece una fecha."""
+    return fecha - timedelta(days=fecha.weekday())
+
+
+def _calcular_prevision_demanda(fecha_referencia=None):
+    """
+    Calcula reservas semanales históricas y una estimación de demanda futura.
+
+    La estimación usa la media de las últimas cuatro semanas históricas. Se
+    considera que no hay datos suficientes si no hay reservas en al menos dos
+    semanas del periodo histórico.
+    """
+    hoy = fecha_referencia or timezone.localdate()
+    inicio_semana_actual = _inicio_semana(hoy)
+    inicio_historico = inicio_semana_actual - timedelta(weeks=SEMANAS_HISTORICO - 1)
+    fin_historico = inicio_semana_actual + timedelta(weeks=1)
+
+    zona = timezone.get_current_timezone()
+    inicio_dt = timezone.make_aware(datetime.combine(inicio_historico, time.min), zona)
+    fin_dt = timezone.make_aware(datetime.combine(fin_historico, time.min), zona)
+
+    semanas = [
+        inicio_historico + timedelta(weeks=i)
+        for i in range(SEMANAS_HISTORICO)
+    ]
+    conteos = {semana: 0 for semana in semanas}
+
+    reservas = Booking.objects.filter(
+        status=Booking.Status.CONFIRMED,
+        start_time__gte=inicio_dt,
+        start_time__lt=fin_dt,
+    ).only('start_time')
+
+    for reserva in reservas:
+        fecha_reserva = timezone.localtime(reserva.start_time).date()
+        semana = _inicio_semana(fecha_reserva)
+        if semana in conteos:
+            conteos[semana] += 1
+
+    etiquetas_historico = [semana.strftime('%d/%m') for semana in semanas]
+    valores_historico = [conteos[semana] for semana in semanas]
+
+    semanas_con_datos = sum(1 for valor in valores_historico if valor > 0)
+    datos_suficientes = semanas_con_datos >= MIN_SEMANAS_CON_DATOS
+
+    promedio_semanal = None
+    if datos_suficientes:
+        ventana = valores_historico[-4:]
+        promedio_semanal = round(sum(ventana) / len(ventana), 1)
+        valores_prevision = [promedio_semanal] * SEMANAS_PREVISION
+        datos_prevision = (
+            [None] * (SEMANAS_HISTORICO - 1)
+            + [valores_historico[-1]]
+            + valores_prevision
+        )
+    else:
+        datos_prevision = [None] * (SEMANAS_HISTORICO + SEMANAS_PREVISION)
+
+    etiquetas_prevision = [
+        (inicio_semana_actual + timedelta(weeks=i + 1)).strftime('%d/%m')
+        for i in range(SEMANAS_PREVISION)
+    ]
+
+    return {
+        'labels': etiquetas_historico + etiquetas_prevision,
+        'historico': valores_historico + [None] * SEMANAS_PREVISION,
+        'prevision': datos_prevision,
+        'datos_suficientes': datos_suficientes,
+        'semanas_con_datos': semanas_con_datos,
+        'total_historico': sum(valores_historico),
+        'promedio_semanal': promedio_semanal,
+    }
+
 
 
 def calendario(request, resource_id):
@@ -234,6 +316,24 @@ def reserva_detalle(request, booking_id):
 
     return render(request, 'reservas/reserva_detalle.html', {
         'reserva': reserva,
+    })
+
+
+@staff_member_required
+def prevision_demanda(request):
+    """
+    Muestra al administrador un gráfico de demanda histórica y estimada.
+    """
+    datos_grafico = _calcular_prevision_demanda()
+
+    return render(request, 'reservas/prevision_demanda.html', {
+        'datos_grafico': datos_grafico,
+        'datos_suficientes': datos_grafico['datos_suficientes'],
+        'semanas_con_datos': datos_grafico['semanas_con_datos'],
+        'total_historico': datos_grafico['total_historico'],
+        'promedio_semanal': datos_grafico['promedio_semanal'],
+        'semanas_historico': SEMANAS_HISTORICO,
+        'semanas_prevision': SEMANAS_PREVISION,
     })
 
 
